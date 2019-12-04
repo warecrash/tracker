@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	flag "github.com/spf13/pflag"
 )
@@ -66,11 +67,13 @@ func main() {
 	data, err := ioutil.ReadFile(saveFile)
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	err = json.Unmarshal(data, &user)
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	switch op {
