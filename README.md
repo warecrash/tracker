@@ -1,6 +1,6 @@
 # Tracker
 
-Measure weekly tasks in 2.5 hour blocks
+Measure weekly tasks in blocks of arbitrary length
 
 
 ## Usage
@@ -16,7 +16,7 @@ Options:
 ```
 
 ## Example tasks.json
-Each task requires three attributes: name, limit, and current. The name is just a string that comes up in the list of tasks. The limit is the maximum number of 2.5 hour blocks you want to spend working on that task each week. The current should be zero in your config, it is used by tracker to measure how many blocks you have completed.
+Each task requires three attributes: name, limit, and current. The name is just a string that comes up in the list of tasks. The limit is the maximum number of blocks you want to spend working on that task each week. The current should be zero in your config, it is used by tracker to measure how many blocks you have completed.
 ```
 {
 	"tasks": [{
