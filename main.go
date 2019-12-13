@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 
 	flag "github.com/spf13/pflag"
 )
 
-var saveFile string = "tasks.json"
+var filepath string
 
-type Task struct {
+type TaskFile struct {
 	Tasks []struct {
 		Name    string `json:"name"`
 		Limit   int    `json:"limit"`
@@ -19,18 +20,7 @@ type Task struct {
 	} `json:"tasks"`
 }
 
-func save(user Task) {
-	output, err := json.Marshal(user)
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = ioutil.WriteFile(saveFile, output, 0644)
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func listTasks(user Task) {
+func listTasks(user TaskFile) {
 	for index, currTask := range user.Tasks {
 		if currTask.Limit != currTask.Current {
 			fmt.Printf("%d: %s [%d/%d]\n", index, currTask.Name, currTask.Current, currTask.Limit)
@@ -38,57 +28,92 @@ func listTasks(user Task) {
 	}
 }
 
-func resetTasks(user Task) {
-	fmt.Printf("Resetting tasks in %s\n", saveFile)
+func resetTasks(user TaskFile) TaskFile {
+	fmt.Printf("Resetting tasks")
 	for index, _ := range user.Tasks {
 		user.Tasks[index].Current = 0
 	}
-	save(user)
+	return user
 }
 
-func startTask(user Task, id int) {
+func startTask(user TaskFile, id int) TaskFile {
 	if user.Tasks[id].Current != user.Tasks[id].Limit {
 		fmt.Printf("Working on %s\n", user.Tasks[id].Name)
 		user.Tasks[id].Current = user.Tasks[id].Current + 1
 	} else {
 		fmt.Println("You have already met the limit for that task")
 	}
-	save(user)
+	return user
 }
+
+func panicIfErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+//May only definitively prove it doesn't exist.
+//Beware false positives
+func exists(filepath string) bool {
+	_, err := os.Stat(filepath)
+	return os.IsNotExist(err)
+}
+
+func loadTasks() (TaskFile, error) {
+	var ret TaskFile
+	filepath = "tasks.json"
+	if !exists(filepath) {
+		dir := os.Getenv("HOME") + "/.config/tracker"
+		filepath = dir + "/data.json"
+        if err := os.MkdirAll(dir, 0755); err != nil {
+			if !exists(filepath) {
+				return ret, ioutil.WriteFile(filepath, []byte("{tasks:[]}"), 0644)
+			}
+		} else {
+			return ret, err
+		}
+	}
+
+    data, err := ioutil.ReadFile(filepath)
+	if err == nil {
+		err = json.Unmarshal(data, &ret)
+	}
+	return ret, err
+}
+
 func main() {
 	var id int
 	var op string
-	var user Task
 
 	flag.IntVarP(&id, "task", "t", 999, "The task you want to start.")
 	flag.Parse()
 	op = flag.Arg(0)
 
-	data, err := ioutil.ReadFile(saveFile)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	tfile, err := loadTasks()
+	panicIfErr(err)
 
-	err = json.Unmarshal(data, &user)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	newTFile := tfile
 
 	switch op {
 	case "list":
-		listTasks(user)
+		listTasks(tfile)
 	case "reset":
-		resetTasks(user)
+		newTFile = resetTasks(tfile)
 	case "start":
 		if id != 999 {
-			startTask(user, id)
+			newTFile = startTask(tfile, id)
 			break
 		}
 		fallthrough
 	default:
 		fmt.Printf("Measure weekly tasks in 2.5 hour blocks\n\nUsage:\n  tracker <command> [options]\nCommands:\n  list\n  reset\n  start\nOptions:\n")
 		flag.PrintDefaults()
+	}
+
+	if !reflect.DeepEqual(newTFile, tfile) {
+		output, err := json.Marshal(newTFile)
+		panicIfErr(err)
+		err = ioutil.WriteFile(filepath, output, 0644)
+		panicIfErr(err)
 	}
 }
